@@ -8,7 +8,7 @@
 </head>
 <body>
   <script>
-    // Setting up a basic Phaser.js single-player game prototype
+    // Setting up a Phaser.js single-player game prototype with WASD and space bar inputs
     const config = {
       type: Phaser.AUTO,
       width: 800,
@@ -31,11 +31,12 @@
     const game = new Phaser.Game(config);
 
     let player;
-    let cursors;
+    let keys;
     let dnaGroup;
     let score = 0;
     let scoreText;
-    let timerEvent;
+    let progressText;
+    let collectedDNA = 0;
 
     function preload() {
       this.load.image('player', 'https://via.placeholder.com/40x40.png?text=P'); // Placeholder for player
@@ -51,7 +52,7 @@
       dnaGroup = this.physics.add.group();
 
       // Spawn DNA at intervals
-      timerEvent = this.time.addEvent({
+      this.time.addEvent({
         delay: 10000, // Every 10 seconds
         callback: spawnDNA,
         callbackScope: this,
@@ -59,29 +60,45 @@
       });
 
       // Add collision detection
-      this.physics.add.overlap(player, dnaGroup, collectDNA, null, this);
+      this.physics.add.overlap(player, dnaGroup, handleDNAOverlap, null, this);
 
-      // Add score text
+      // Add UI elements
       scoreText = this.add.text(10, 10, 'Score: 0', { fontSize: '20px', fill: '#fff' });
+      progressText = this.add.text(10, 40, 'Progress: 0%', { fontSize: '20px', fill: '#fff' });
 
       // Set up controls
-      cursors = this.input.keyboard.createCursorKeys();
+      keys = this.input.keyboard.addKeys({
+        up: 'W',
+        down: 'S',
+        left: 'A',
+        right: 'D',
+        collect: 'SPACE'
+      });
     }
 
     function update() {
       // Player movement
       player.setVelocity(0);
 
-      if (cursors.left.isDown) {
+      if (keys.left.isDown) {
         player.setVelocityX(-200);
-      } else if (cursors.right.isDown) {
+      } else if (keys.right.isDown) {
         player.setVelocityX(200);
       }
 
-      if (cursors.up.isDown) {
+      if (keys.up.isDown) {
         player.setVelocityY(-200);
-      } else if (cursors.down.isDown) {
+      } else if (keys.down.isDown) {
         player.setVelocityY(200);
+      }
+
+      // Collect DNA manually when touching and pressing SPACE
+      if (keys.collect.isDown) {
+        dnaGroup.children.iterate(dna => {
+          if (Phaser.Geom.Intersects.RectangleToRectangle(player.getBounds(), dna.getBounds())) {
+            collectDNA(dna);
+          }
+        });
       }
     }
 
@@ -99,11 +116,21 @@
       });
     }
 
-    function collectDNA(player, dna) {
+    function handleDNAOverlap(player, dna) {
+      // Do nothing, collection is manual with SPACE
+    }
+
+    function collectDNA(dna) {
       dna.destroy(); // Remove DNA
       score += 10; // Increment score
-      scoreText.setText('Score: ' + score); // Update score display
+      collectedDNA += 1; // Track collected DNA
+
+      // Calculate and display progress
+      const progress = Math.min(100, (collectedDNA / 10) * 100).toFixed(1);
+      scoreText.setText('Score: ' + score);
+      progressText.setText('Progress: ' + progress + '%');
     }
   </script>
 </body>
 </html>
+
