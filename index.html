@@ -1,64 +1,32 @@
-// Import necessary libraries
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
-
-import spark.Spark;
-
-public class PresidentialActionsScraper {
-
-    // Method to scrape headlines from the given URL
-    public static List<String> scrapeHeadlines(String baseUrl) {
-        List<String> headlines = new ArrayList<>();
-        String nextPageUrl = baseUrl;
-
-        try {
-            // Loop through all pages
-            while (nextPageUrl != null) {
-                Document doc = Jsoup.connect(nextPageUrl).get();
-                
-                // Select headlines on the current page
-                Elements headlineElements = doc.select("h2 a");
-                for (Element headline : headlineElements) {
-                    headlines.add(headline.text());
-                }
-
-                // Find the link to the next page (if it exists)
-                Element nextPageElement = doc.selectFirst("a.pagination-next");
-                nextPageUrl = nextPageElement != null ? nextPageElement.absUrl("href") : null;
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        return headlines;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Presidential Actions Scraper</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      margin: 20px;
     }
-
-    public static void main(String[] args) {
-        String baseUrl = "https://www.whitehouse.gov/presidential-actions/";
-
-        // Configure Spark (a lightweight Java framework) for a web server
-        Spark.port(4567);
-
-        // Define the route for the home page
-        Spark.get("/", (req, res) -> {
-            List<String> headlines = scrapeHeadlines(baseUrl);
-
-            // Generate an HTML response
-            StringBuilder html = new StringBuilder("<html><head><title>Presidential Actions</title></head><body>");
-            html.append("<h1>Presidential Actions Headlines</h1><ul>");
-
-            for (String headline : headlines) {
-                html.append("<li>").append(headline).append("</li>");
-            }
-
-            html.append("</ul></body></html>");
-            return html.toString();
-        });
+    h1 {
+      color: #333;
     }
-}
+    ul {
+      padding: 0;
+      list-style: none;
+    }
+    li {
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Presidential Actions</h1>
+  <button id="fetch-data">Fetch Presidential Actions</button>
+  <ul id="headlines"></ul>
+
+  <script src="app.js"></script>
+</body>
+</html>
