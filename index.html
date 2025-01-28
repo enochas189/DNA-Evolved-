@@ -1,143 +1,64 @@
-# Directory structure for the project:
-# /presidential-actions-monitor
-# |-- app/
-# |    |-- __init__.py
-# |    |-- routes.py
-# |-- scraper/
-# |    |-- __init__.py
-# |    |-- scraper.py
-# |-- templates/
-# |    |-- index.html
-# |-- static/
-# |    |-- style.css
-# |-- app.py
-# |-- requirements.txt
-# |-- README.md
+// Import necessary libraries
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
-# app.py: Main entry point for the Flask app
-from flask import Flask
-from app.routes import app_routes
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 
-app = Flask(__name__)
-app.register_blueprint(app_routes)
+import spark.Spark;
 
-if __name__ == "__main__":
-    app.run(debug=True)
+public class PresidentialActionsScraper {
 
-# /app/routes.py: Defines Flask routes
-from flask import Blueprint, render_template, jsonify
-from scraper.scraper import fetch_headlines
+    // Method to scrape headlines from the given URL
+    public static List<String> scrapeHeadlines(String baseUrl) {
+        List<String> headlines = new ArrayList<>();
+        String nextPageUrl = baseUrl;
 
-app_routes = Blueprint("app_routes", __name__)
+        try {
+            // Loop through all pages
+            while (nextPageUrl != null) {
+                Document doc = Jsoup.connect(nextPageUrl).get();
+                
+                // Select headlines on the current page
+                Elements headlineElements = doc.select("h2 a");
+                for (Element headline : headlineElements) {
+                    headlines.add(headline.text());
+                }
 
-BASE_URL = "https://www.whitehouse.gov/presidential-actions/"
+                // Find the link to the next page (if it exists)
+                Element nextPageElement = doc.selectFirst("a.pagination-next");
+                nextPageUrl = nextPageElement != null ? nextPageElement.absUrl("href") : null;
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 
-@app_routes.route("/")
-def home():
-    headlines = fetch_headlines(BASE_URL)
-    return render_template("index.html", headlines=headlines)
+        return headlines;
+    }
 
-@app_routes.route("/api/headlines")
-def api_headlines():
-    headlines = fetch_headlines(BASE_URL)
-    return jsonify(headlines)
+    public static void main(String[] args) {
+        String baseUrl = "https://www.whitehouse.gov/presidential-actions/";
 
-# /scraper/scraper.py: Handles web scraping
-import requests
-from bs4 import BeautifulSoup
+        // Configure Spark (a lightweight Java framework) for a web server
+        Spark.port(4567);
 
-def fetch_headlines(base_url):
-    headlines = []
-    page = 1
+        // Define the route for the home page
+        Spark.get("/", (req, res) -> {
+            List<String> headlines = scrapeHeadlines(baseUrl);
 
-    while True:
-        url = f"{base_url}?page={page}"
-        response = requests.get(url)
-        if response.status_code != 200:
-            break
+            // Generate an HTML response
+            StringBuilder html = new StringBuilder("<html><head><title>Presidential Actions</title></head><body>");
+            html.append("<h1>Presidential Actions Headlines</h1><ul>");
 
-        soup = BeautifulSoup(response.text, "html.parser")
-        headline_tags = soup.find_all("h2", class_="action-title")
+            for (String headline : headlines) {
+                html.append("<li>").append(headline).append("</li>");
+            }
 
-        if not headline_tags:
-            break
-
-        for tag in headline_tags:
-            headlines.append(tag.text.strip())
-
-        page += 1
-
-    return headlines
-
-# /templates/index.html: HTML template
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Presidential Actions</title>
-    <link rel="stylesheet" href="/static/style.css">
-</head>
-<body>
-    <h1>Presidential Actions Monitor</h1>
-    <ul>
-        {% for headline in headlines %}
-        <li>{{ headline }}</li>
-        {% endfor %}
-    </ul>
-</body>
-</html>
-
-# /static/style.css: Basic styling
-body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 0;
-    background-color: #f9f9f9;
-    color: #333;
+            html.append("</ul></body></html>");
+            return html.toString();
+        });
+    }
 }
-
-h1 {
-    text-align: center;
-    padding: 1em;
-}
-
-ul {
-    list-style-type: none;
-    padding: 0;
-}
-
-li {
-    background: #fff;
-    margin: 0.5em auto;
-    padding: 1em;
-    border-radius: 5px;
-    max-width: 600px;
-    box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
-}
-
-# requirements.txt
-flask
-beautifulsoup4
-requests
-
-# README.md: Documentation
-# Presidential Actions Monitor
-
-This project scrapes headlines from the White House "Presidential Actions" page and displays them in real time.
-
-## Installation
-1. Clone the repository.
-2. Navigate to the project directory.
-3. Install dependencies: `pip install -r requirements.txt`
-4. Run the application: `python app.py`
-
-## Features
-- Real-time scraping of headlines.
-- Pagination support to fetch all headlines.
-- Simple, user-friendly web interface.
-- API endpoint for JSON data: `/api/headlines`
-
-## Future Improvements
-- Add database support for caching.
-- Implement advanced filtering or search.
