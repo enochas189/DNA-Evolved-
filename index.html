@@ -1,237 +1,143 @@
+# Directory structure for the project:
+# /presidential-actions-monitor
+# |-- app/
+# |    |-- __init__.py
+# |    |-- routes.py
+# |-- scraper/
+# |    |-- __init__.py
+# |    |-- scraper.py
+# |-- templates/
+# |    |-- index.html
+# |-- static/
+# |    |-- style.css
+# |-- app.py
+# |-- requirements.txt
+# |-- README.md
+
+# app.py: Main entry point for the Flask app
+from flask import Flask
+from app.routes import app_routes
+
+app = Flask(__name__)
+app.register_blueprint(app_routes)
+
+if __name__ == "__main__":
+    app.run(debug=True)
+
+# /app/routes.py: Defines Flask routes
+from flask import Blueprint, render_template, jsonify
+from scraper.scraper import fetch_headlines
+
+app_routes = Blueprint("app_routes", __name__)
+
+BASE_URL = "https://www.whitehouse.gov/presidential-actions/"
+
+@app_routes.route("/")
+def home():
+    headlines = fetch_headlines(BASE_URL)
+    return render_template("index.html", headlines=headlines)
+
+@app_routes.route("/api/headlines")
+def api_headlines():
+    headlines = fetch_headlines(BASE_URL)
+    return jsonify(headlines)
+
+# /scraper/scraper.py: Handles web scraping
+import requests
+from bs4 import BeautifulSoup
+
+def fetch_headlines(base_url):
+    headlines = []
+    page = 1
+
+    while True:
+        url = f"{base_url}?page={page}"
+        response = requests.get(url)
+        if response.status_code != 200:
+            break
+
+        soup = BeautifulSoup(response.text, "html.parser")
+        headline_tags = soup.find_all("h2", class_="action-title")
+
+        if not headline_tags:
+            break
+
+        for tag in headline_tags:
+            headlines.append(tag.text.strip())
+
+        page += 1
+
+    return headlines
+
+# /templates/index.html: HTML template
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Evolve or Perish</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.55.2/phaser.min.js"></script>
-  <style>
-    body, html {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      width: 100%;
-      overflow: hidden;
-      position: relative;
-    }
-
-    .upgrade-box, .effect-box {
-      position: absolute;
-      z-index: 10; /* Ensures the boxes are above the game canvas */
-      background-color: rgba(0, 0, 0, 0.7);
-      border: 2px solid white;
-      padding: 10px;
-      color: white;
-    }
-
-    .upgrade-box {
-      top: 10px;
-      right: 10px;
-      width: 200px;
-      height: 500px;
-      overflow-y: auto;
-    }
-
-    .effect-box {
-      top: 250px;
-      right: 10px;
-      width: 200px;
-      height: 100px;
-      background-color: #333;
-    }
-
-    .upgrade-item {
-      margin-bottom: 10px;
-      background-color: #444;
-      color: white;
-      padding: 5px;
-      cursor: pointer;
-      text-align: center;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Presidential Actions</title>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <div class="upgrade-box" id="upgradeBox">
-    <h3>Collected DNA</h3>
-  </div>
-  <div class="effect-box" id="effectBox">
-    <h3>Character Traits</h3>
-  </div>
-
-  <script>
-    const config = {
-      type: Phaser.AUTO,
-      width: 800,
-      height: 600,
-      backgroundColor: '#1e1e1e',
-      physics: {
-        default: 'arcade',
-        arcade: {
-          gravity: { y: 0 },
-          debug: false
-        }
-      },
-      scene: {
-        preload: preload,
-        create: create,
-        update: update
-      }
-    };
-
-    const game = new Phaser.Game(config);
-
-    let player;
-    let keys;
-    let dnaGroup;
-    let score = 0;
-    let scoreText;
-    let progressText;
-    let collectedDNA = 0;
-
-    const dnaUpgrades = [
-      { name: 'Enhanced Strength', effect: 10, color: 0xff0000 },
-      { name: 'Improved Vision', effect: 10, color: 0x00ff00 },
-      { name: 'Fast Metabolism', effect: 10, color: 0x0000ff },
-      { name: 'Decreased Agility', effect: -10, color: 0xffff00 },
-      { name: 'Weakened Immunity', effect: -10, color: 0xff00ff },
-      { name: 'Slower Reflexes', effect: -10, color: 0x00ffff }
-    ];
-
-    let draggableItems = []; // Store references to DNA items for dragging
-    let characterTraits = { strength: 0, vision: 0, metabolism: 0, agility: 0, immunity: 0, reflexes: 0 };
-
-    function preload() {
-      this.load.image('player', 'https://via.placeholder.com/40x40.png?text=P'); // Placeholder for player
-      this.load.image('dna', 'https://via.placeholder.com/20x20.png?text=DNA'); // Placeholder for DNA
-    }
-
-    function create() {
-      player = this.physics.add.sprite(400, 300, 'player');
-      player.setCollideWorldBounds(true);
-
-      dnaGroup = this.physics.add.group();
-
-      this.time.addEvent({
-        delay: 10000,
-        callback: spawnDNA,
-        callbackScope: this,
-        loop: true
-      });
-
-      this.physics.add.overlap(player, dnaGroup, handleDNAOverlap, null, this);
-
-      scoreText = this.add.text(10, 10, 'Score: 0', { fontSize: '20px', fill: '#fff' });
-      progressText = this.add.text(10, 40, 'Progress: 0%', { fontSize: '20px', fill: '#fff' });
-
-      keys = this.input.keyboard.addKeys({
-        up: 'W',
-        down: 'S',
-        left: 'A',
-        right: 'D',
-        collect: 'SPACE'
-      });
-    }
-
-    function update() {
-      player.setVelocity(0);
-
-      if (keys.left.isDown) {
-        player.setVelocityX(-200);
-      } else if (keys.right.isDown) {
-        player.setVelocityX(200);
-      }
-
-      if (keys.up.isDown) {
-        player.setVelocityY(-200);
-      } else if (keys.down.isDown) {
-        player.setVelocityY(200);
-      }
-
-      if (keys.collect.isDown) {
-        dnaGroup.children.iterate(dna => {
-          if (Phaser.Geom.Intersects.RectangleToRectangle(player.getBounds(), dna.getBounds())) {
-            collectDNA(dna);
-          }
-        });
-      }
-
-      draggableItems.forEach(item => {
-        item.update();
-      });
-    }
-
-    function spawnDNA() {
-      const x = Phaser.Math.Between(20, 780);
-      const y = Phaser.Math.Between(20, 580);
-      const dnaType = Phaser.Utils.Array.GetRandom(dnaUpgrades);
-      const dna = dnaGroup.create(x, y, 'dna');
-
-      dna.setTint(dnaType.color);
-      dna.effect = dnaType.effect;
-      dna.name = dnaType.name;
-
-      this.time.addEvent({
-        delay: 8000,
-        callback: () => dna.destroy(),
-        callbackScope: this
-      });
-    }
-
-    function handleDNAOverlap(player, dna) {
-      // Do nothing, collection is manual with SPACE
-    }
-
-    function collectDNA(dna) {
-      dna.destroy();
-      score += dna.effect;
-      collectedDNA += 1;
-
-      const progress = Math.min(100, (collectedDNA / 10) * 100).toFixed(1);
-      scoreText.setText(`Score: ${score} (${dna.name})`);
-      progressText.setText('Progress: ' + progress + '%');
-
-      // Add collected DNA to the upgrade box
-      const dnaItem = createDraggableItem(dna.name, dna.effect);
-      document.getElementById('upgradeBox').appendChild(dnaItem.element);
-      draggableItems.push(dnaItem);
-    }
-
-    function createDraggableItem(name, effect) {
-      const item = document.createElement('div');
-      item.className = 'upgrade-item';
-      item.innerHTML = `${name} (Effect: ${effect})`;
-      item.draggable = true;
-
-      item.ondragstart = (e) => {
-        e.dataTransfer.setData('text', name);
-      };
-
-      item.ondragend = (e) => {
-        const rect = document.getElementById('effectBox').getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        if (x > 0 && y > 0 && x < rect.width && y < rect.height) {
-          applyTraitEffect(name, effect);
-          item.remove();
-        }
-      };
-
-      return { element: item, update: () => {} };
-    }
-
-    function applyTraitEffect(name, effect) {
-      // Apply the effect to character traits based on the name of the upgrade
-      if (name === 'Enhanced Strength') characterTraits.strength += effect;
-      if (name === 'Improved Vision') characterTraits.vision += effect;
-      if (name === 'Fast Metabolism') characterTraits.metabolism += effect;
-      if (name === 'Decreased Agility') characterTraits.agility += effect;
-      if (name === 'Weakened Immunity') characterTraits.immunity += effect;
-      if (name === 'Slower Reflexes') characterTraits.reflexes += effect;
-
-      // Optionally, show updated character traits
-      console.log(characterTraits);
-    }
-  </script>
+    <h1>Presidential Actions Monitor</h1>
+    <ul>
+        {% for headline in headlines %}
+        <li>{{ headline }}</li>
+        {% endfor %}
+    </ul>
 </body>
 </html>
+
+# /static/style.css: Basic styling
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f9f9f9;
+    color: #333;
+}
+
+h1 {
+    text-align: center;
+    padding: 1em;
+}
+
+ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+li {
+    background: #fff;
+    margin: 0.5em auto;
+    padding: 1em;
+    border-radius: 5px;
+    max-width: 600px;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+}
+
+# requirements.txt
+flask
+beautifulsoup4
+requests
+
+# README.md: Documentation
+# Presidential Actions Monitor
+
+This project scrapes headlines from the White House "Presidential Actions" page and displays them in real time.
+
+## Installation
+1. Clone the repository.
+2. Navigate to the project directory.
+3. Install dependencies: `pip install -r requirements.txt`
+4. Run the application: `python app.py`
+
+## Features
+- Real-time scraping of headlines.
+- Pagination support to fetch all headlines.
+- Simple, user-friendly web interface.
+- API endpoint for JSON data: `/api/headlines`
+
+## Future Improvements
+- Add database support for caching.
+- Implement advanced filtering or search.
